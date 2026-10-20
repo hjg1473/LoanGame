@@ -1,12 +1,13 @@
 using UnityEngine;
 using LoadGame.Economy;
+using LoadGame.UI;
 
 namespace LoadGame.Map
 {
     public sealed class MapManager : MonoBehaviour
     {
         [Header("Data")]
-        [SerializeField] private string mapResourcePath = "test_map";
+        [SerializeField] private string mapResourcePath = "city_map";
 
         [Header("Scene References")]
         [SerializeField] private Camera targetCamera;
@@ -15,6 +16,14 @@ namespace LoadGame.Map
         [SerializeField] private GridCellSelectionController selectionController;
         [SerializeField] private CellInfoPopup cellInfoPopup;
         [SerializeField] private EconomyManager economyManager;
+        [SerializeField] private PopulationManager populationManager;
+        [SerializeField] private CityValueManager cityValueManager;
+        [SerializeField] private StockMarketManager stockMarketManager;
+        [SerializeField] private NetWorthManager netWorthManager;
+        [SerializeField] private CashDisplay cashDisplay;
+        [SerializeField] private DevelopmentProjectManager developmentProjectManager;
+        [SerializeField] private ProjectPanelUI projectPanelUI;
+        [SerializeField] private SaveGameManager saveGameManager;
 
         private GridMapData mapData;
 
@@ -47,7 +56,101 @@ namespace LoadGame.Map
             cellInfoPopup.SetSelectionController(selectionController);
             cellInfoPopup.Hide();
 
+            if (populationManager == null)
+            {
+                populationManager = FindFirstObjectByType<PopulationManager>();
+            }
+
+            if (populationManager == null)
+            {
+                populationManager = gameObject.AddComponent<PopulationManager>();
+            }
+
+            populationManager.Initialize(mapData, economyManager);
+
+            if (cityValueManager == null)
+            {
+                cityValueManager = FindFirstObjectByType<CityValueManager>();
+            }
+
+            if (cityValueManager == null)
+            {
+                cityValueManager = gameObject.AddComponent<CityValueManager>();
+            }
+
+            if (cityValueManager != null)
+            {
+                cityValueManager.Initialize(mapData, mapRenderer, economyManager);
+            }
+
+            if (stockMarketManager == null)
+            {
+                stockMarketManager = FindFirstObjectByType<StockMarketManager>();
+            }
+
+            if (stockMarketManager != null)
+            {
+                stockMarketManager.SetCityValueManager(cityValueManager);
+            }
+
+            if (netWorthManager == null)
+            {
+                netWorthManager = FindFirstObjectByType<NetWorthManager>();
+            }
+
+            if (netWorthManager == null)
+            {
+                netWorthManager = gameObject.AddComponent<NetWorthManager>();
+            }
+
+            netWorthManager.Initialize(economyManager, cityValueManager, stockMarketManager);
+
+            if (cashDisplay == null)
+            {
+                cashDisplay = FindFirstObjectByType<CashDisplay>();
+            }
+
+            if (cashDisplay != null)
+            {
+                cashDisplay.SetValueManagers(cityValueManager, netWorthManager);
+                cashDisplay.SetPopulationManager(populationManager);
+            }
+
+            if (developmentProjectManager == null)
+            {
+                developmentProjectManager = FindFirstObjectByType<DevelopmentProjectManager>();
+            }
+
+            if (developmentProjectManager == null)
+            {
+                developmentProjectManager = gameObject.AddComponent<DevelopmentProjectManager>();
+            }
+
+            developmentProjectManager.Initialize(mapData, mapRenderer, economyManager, cityValueManager);
+
+            if (projectPanelUI == null)
+            {
+                projectPanelUI = FindFirstObjectByType<ProjectPanelUI>();
+            }
+
+            if (projectPanelUI != null)
+            {
+                projectPanelUI.SetProjectManager(developmentProjectManager);
+            }
+
+            if (saveGameManager == null)
+            {
+                saveGameManager = FindFirstObjectByType<SaveGameManager>();
+            }
+            if (saveGameManager == null)
+            {
+                saveGameManager = gameObject.AddComponent<SaveGameManager>();
+            }
+            saveGameManager.Initialize(mapData, mapRenderer, economyManager, populationManager, developmentProjectManager);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("MapManager initialized map renderer, camera pan, selection, and popup.", this);
+#endif
         }
 
         private void OnValidate()

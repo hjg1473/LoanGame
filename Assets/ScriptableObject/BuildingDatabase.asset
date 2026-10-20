@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 382a1e9ff514ee346a495c37c1ad3711, type: 3}
+  m_Name: BuildingDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::LoadGame.Map.BuildingDatabase
+  buildings:
+  - {fileID: 11400000, guid: f5f474a9b781bcf47b2245567fd11929, type: 2}
+  - {fileID: 11400000, guid: a26c2387320210f42994fec59166dbbd, type: 2}
+  - {fileID: 11400000, guid: fbf132f7b3811974a8e391ed0e36f169, type: 2}
+  - {fileID: 11400000, guid: c04deb045948def479e69c1cd7d900ca, type: 2}
+  - {fileID: 11400000, guid: 244d3ffc590e5984a874c31ff1653e5e, type: 2}
+  - {fileID: 11400000, guid: 14239a5716648744192a3a449c5e0f1d, type: 2}
+  - {fileID: 11400000, guid: 362d82d2f1a6301448a11bda8a840f01, type: 2}
+  - {fileID: 11400000, guid: 495c81157d5384749957f3503b7a5039, type: 2}
+  - {fileID: 11400000, guid: 7d6b17e15524d6f43b615e13f5b56349, type: 2}
+  - {fileID: 11400000, guid: 04ff0edc1f505dd4996f4c4e6129b214, type: 2}
+  - {fileID: 11400000, guid: 18173f00d5dfdab4ea7fcbe9ec7b5745, type: 2}
+  - {fileID: 11400000, guid: 15b23c67a24cee942a83c32ea933231e, type: 2}
+  - {fileID: 11400000, guid: f81b7a86d9b998048b422a1fbb588eb2, type: 2}
+  - {fileID: 11400000, guid: 1154f1ffcb77ef9428f4b7c66915e2d8, type: 2}

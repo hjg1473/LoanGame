@@ -1,5 +1,7 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using LoadGame.Audio;
 
 namespace LoadGame.Map
 {
@@ -44,7 +46,7 @@ namespace LoadGame.Map
         {
             if (mapRenderer == null)
             {
-                mapRenderer = FindObjectOfType<ChunkedGridMapRenderer>();
+                mapRenderer = FindFirstObjectByType<ChunkedGridMapRenderer>();
             }
 
             if (mapRenderer != null && mapRenderer.MapData != null)
@@ -55,28 +57,33 @@ namespace LoadGame.Map
 
         private void Update()
         {
-            Mouse mouse = Mouse.current;
-            if (mouse == null)
+            if (!TryGetPointerState(out Vector2 screenPosition, out bool pressedThisFrame, out bool releasedThisFrame, out int pointerId))
             {
                 return;
             }
 
-            if (mouse.leftButton.wasPressedThisFrame)
+            if (pressedThisFrame)
             {
+                if (IsPointerOverUI(pointerId))
+                {
+                    isDragging = false;
+                    return;
+                }
+
                 isDragging = true;
-                lastPointerWorld = ScreenToWorldOnMapPlane(mouse.position.ReadValue());
+                lastPointerWorld = ScreenToWorldOnMapPlane(screenPosition);
                 if (debugInput)
                 {
-                    Debug.Log($"Drag down. screen={mouse.position.ReadValue()}, world={lastPointerWorld}", this);
+                    Debug.Log($"Drag down. screen={screenPosition}, world={lastPointerWorld}", this);
                 }
             }
 
-            if (mouse.leftButton.wasReleasedThisFrame)
+            if (releasedThisFrame)
             {
                 isDragging = false;
                 if (debugInput)
                 {
-                    Debug.Log($"Drag up. screen={mouse.position.ReadValue()}, cameraPos={transform.position}", this);
+                    Debug.Log($"Drag up. screen={screenPosition}, cameraPos={transform.position}", this);
                 }
             }
 
@@ -85,7 +92,7 @@ namespace LoadGame.Map
                 return;
             }
 
-            Vector3 pointerWorld = ScreenToWorldOnMapPlane(mouse.position.ReadValue());
+            Vector3 pointerWorld = ScreenToWorldOnMapPlane(screenPosition);
             Vector3 delta = lastPointerWorld - pointerWorld;
             transform.position += delta * dragSpeed;
             ClampToBounds();
@@ -94,6 +101,43 @@ namespace LoadGame.Map
             {
                 Debug.Log($"Dragging. pointerWorld={pointerWorld}, delta={delta}, cameraPos={transform.position}", this);
             }
+        }
+
+        private static bool TryGetPointerState(
+            out Vector2 screenPosition,
+            out bool pressedThisFrame,
+            out bool releasedThisFrame,
+            out int pointerId)
+        {
+            Touchscreen touchscreen = Touchscreen.current;
+            if (touchscreen != null)
+            {
+                var touch = touchscreen.primaryTouch;
+                if (touch.press.isPressed || touch.press.wasPressedThisFrame || touch.press.wasReleasedThisFrame)
+                {
+                    screenPosition = touch.position.ReadValue();
+                    pressedThisFrame = touch.press.wasPressedThisFrame;
+                    releasedThisFrame = touch.press.wasReleasedThisFrame;
+                    pointerId = touch.touchId.ReadValue();
+                    return true;
+                }
+            }
+
+            Mouse mouse = Mouse.current;
+            if (mouse != null)
+            {
+                screenPosition = mouse.position.ReadValue();
+                pressedThisFrame = mouse.leftButton.wasPressedThisFrame;
+                releasedThisFrame = mouse.leftButton.wasReleasedThisFrame;
+                pointerId = -1;
+                return true;
+            }
+
+            screenPosition = default;
+            pressedThisFrame = false;
+            releasedThisFrame = false;
+            pointerId = -1;
+            return false;
         }
 
         private Vector3 ScreenToWorldOnMapPlane(Vector2 screenPosition)
@@ -121,11 +165,13 @@ namespace LoadGame.Map
         public void ZoomIn()
         {
             SetCameraZ(transform.position.z + zoomStep);
+            SoundManager.Instance?.PlaySFX(SoundId.ButtonClick);
         }
 
         public void ZoomOut()
         {
             SetCameraZ(transform.position.z - zoomStep);
+            SoundManager.Instance?.PlaySFX(SoundId.ButtonClick);
         }
 
         private void SetCameraZ(float z)
@@ -143,6 +189,22 @@ namespace LoadGame.Map
         private static float ClampAxis(float value, float min, float max)
         {
             return min > max ? (min + max) * 0.5f : Mathf.Clamp(value, min, max);
+        }
+
+        private static bool IsPointerOverUI(int pointerId)
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                return false;
+            }
+
+            if (pointerId >= 0)
+            {
+                return eventSystem.IsPointerOverGameObject(pointerId);
+            }
+
+            return eventSystem.IsPointerOverGameObject();
         }
     }
 }

@@ -11,7 +11,6 @@ namespace LoadGame.Map
         [SerializeField] private int blockSize = 8;
 
         public bool Enabled => enabled;
-
         public bool IsRoad(int x, int y)
         {
             if (!enabled)

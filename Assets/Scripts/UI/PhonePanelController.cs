@@ -1,5 +1,7 @@
 using DG.Tweening;
+using LoadGame.Audio;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace LoadGame.UI
@@ -12,6 +14,7 @@ namespace LoadGame.UI
         [SerializeField] private RectTransform phonePanel;
         [SerializeField] private Button closeBackgroundButton;
         [SerializeField] private CanvasGroup contentCanvasGroup;
+        [SerializeField] private PhoneAppManager appManager;
 
         [Header("Phone Open")]
         [SerializeField] private float closedScale = 0.15f;
@@ -34,6 +37,7 @@ namespace LoadGame.UI
         private Sequence iconSequence;
         private RectTransform phoneScaleTarget;
         private bool isOpen;
+        private bool isClosing;
 
         private void Awake()
         {
@@ -43,6 +47,11 @@ namespace LoadGame.UI
             }
 
             phoneScaleTarget = phonePanel != null ? phonePanel : openButtonIcon;
+
+            if (appManager == null)
+            {
+                appManager = GetComponentInChildren<PhoneAppManager>(includeInactive: true);
+            }
 
             if (openButton != null)
             {
@@ -75,6 +84,36 @@ namespace LoadGame.UI
             iconSequence = null;
         }
 
+        private void Update()
+        {
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null || !keyboard.escapeKey.wasPressedThisFrame)
+            {
+                return;
+            }
+
+            HandleBackRequest();
+        }
+
+        public bool HandleBackRequest()
+        {
+            if (appManager != null && appManager.TryCloseCurrentApp())
+            {
+                return true;
+            }
+
+            if (isOpen)
+            {
+                ClosePhone();
+                return true;
+            }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            Application.Quit();
+#endif
+            return false;
+        }
+
         public void OpenPhone()
         {
             if (phonePanel == null)
@@ -84,6 +123,8 @@ namespace LoadGame.UI
             }
 
             isOpen = true;
+            isClosing = false;
+            SoundManager.Instance?.PlaySFX(SoundId.PhoneOpen);
             iconSequence?.Kill();
             iconSequence = null;
             if (openButtonIcon != null)
@@ -93,6 +134,10 @@ namespace LoadGame.UI
 
             phonePanel.gameObject.SetActive(true);
             SetCloseBackgroundActive(true);
+            if (appManager != null)
+            {
+                appManager.OnPhoneOpened();
+            }
 
             if (contentCanvasGroup != null)
             {
@@ -121,7 +166,19 @@ namespace LoadGame.UI
                 return;
             }
 
+            if (!isOpen || isClosing)
+            {
+                return;
+            }
+
             isOpen = false;
+            isClosing = true;
+            SoundManager.Instance?.PlaySFX(SoundId.PhoneClose);
+            SetCloseBackgroundActive(false);
+            if (appManager != null)
+            {
+                appManager.OnPhoneClosing();
+            }
 
             if (contentCanvasGroup != null)
             {
@@ -156,6 +213,7 @@ namespace LoadGame.UI
         private void SetClosedInstant()
         {
             isOpen = false;
+            isClosing = false;
 
             if (phonePanel != null)
             {
@@ -179,12 +237,13 @@ namespace LoadGame.UI
 
         private void OnCloseComplete()
         {
+            isClosing = false;
+
             if (!isOpen && phonePanel != null && disablePhonePanelWhenClosed)
             {
                 phonePanel.gameObject.SetActive(false);
             }
 
-            SetCloseBackgroundActive(false);
             StartIconAttention();
         }
 

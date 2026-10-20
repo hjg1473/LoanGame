@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1172361afd8cbd4db1136fa63ec6f77, type: 3}
+  m_Name: City Power
+  m_EditorClassIdentifier: Assembly-CSharp::LoadGame.Upgrades.UpgradeDefinition
+  upgradeId: cityeff
+  displayName: City Efficiency
+  description: Increase production efficiency across all workplaces.
+  icon: {fileID: 21300000, guid: bf7640c5e778d82478468f3d146e3bde, type: 3}
+  sortOrder: 0
+  effectType: 1
+  startingLevel: 1
+  maxLevel: 999
+  baseCost: 100
+  costGrowth: 1.18
+  multiplierPerLevel: 0.1

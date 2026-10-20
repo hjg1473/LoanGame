@@ -1,7 +1,11 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
+using LoadGame.Audio;
 using LoadGame.Economy;
+using LoadGame.UI;
+using System;
+using System.Collections.Generic;
 
 namespace LoadGame.Map
 {
@@ -10,8 +14,12 @@ namespace LoadGame.Map
         [SerializeField] private ChunkedGridMapRenderer mapRenderer;
         [SerializeField] private CellInfoPopup popup;
         [SerializeField] private float clickMoveThreshold = 8f;
-        [SerializeField] private long landPrice = 100L;
+        [SerializeField] private long startingLandPrice = 100L;
+        [SerializeField] private double landPriceGrowthRate = 0.1d;
         [SerializeField] private EconomyManager economyManager;
+        [Header("Unavailable Land Feedback")]
+        [SerializeField] private CellPurchaseFeedbackPool purchaseFeedbackPool;
+        [SerializeField] private string unavailableLandMessage = "This land cannot be purchased.";
         [SerializeField] private bool debugInput;
 
         private Camera targetCamera;
@@ -21,6 +29,7 @@ namespace LoadGame.Map
         private bool pointerStartedOverUi;
         private GridCellData selectedCell;
         private BuildingDefinition[] buildingDefinitions;
+        private long currentLandPrice;
 
         public void Initialize(ChunkedGridMapRenderer renderer, CellInfoPopup cellPopup, Camera camera, EconomyManager economy)
         {
@@ -38,23 +47,34 @@ namespace LoadGame.Map
         private void Awake()
         {
             targetCamera = Camera.main;
+            currentLandPrice = Math.Max(1L, startingLandPrice);
+            if (string.IsNullOrWhiteSpace(unavailableLandMessage)
+                || unavailableLandMessage == "구매할 수 없는 땅입니다")
+            {
+                unavailableLandMessage = "This land cannot be purchased.";
+            }
         }
 
         private void Start()
         {
             if (mapRenderer == null)
             {
-                mapRenderer = FindObjectOfType<ChunkedGridMapRenderer>();
+                mapRenderer = FindFirstObjectByType<ChunkedGridMapRenderer>();
             }
 
             if (popup == null)
             {
-                popup = FindObjectOfType<CellInfoPopup>();
+                popup = FindFirstObjectByType<CellInfoPopup>();
             }
 
             if (economyManager == null)
             {
                 economyManager = EconomyManager.Instance;
+            }
+
+            if (purchaseFeedbackPool == null)
+            {
+                purchaseFeedbackPool = FindFirstObjectByType<CellPurchaseFeedbackPool>();
             }
 
             if (mapRenderer != null)
@@ -65,37 +85,47 @@ namespace LoadGame.Map
 
         private void Update()
         {
-            Mouse mouse = Mouse.current;
-            if (mouse == null || mapRenderer == null || popup == null || targetCamera == null)
+            if (mapRenderer == null || popup == null || targetCamera == null)
             {
                 return;
             }
 
-            if (mouse.leftButton.wasPressedThisFrame)
+            if (!TryGetPointerState(out Vector2 pointerPosition, out bool pressedThisFrame, out bool releasedThisFrame))
+            {
+                return;
+            }
+
+            if (economyManager != null && economyManager.IsBankrupt())
+            {
+                ClearSelection();
+                return;
+            }
+
+            if (pressedThisFrame)
             {
                 pointerDown = true;
                 isDraggingPointer = false;
-                pointerStartedOverUi = IsPointerOverUi();
-                pointerDownPosition = mouse.position.ReadValue();
+                pointerStartedOverUi = IsPointerOverUi(pointerPosition);
+                pointerDownPosition = pointerPosition;
                 if (debugInput)
                 {
                     Debug.Log($"Selection pointer down. screen={pointerDownPosition}, overUi={pointerStartedOverUi}", this);
                 }
             }
 
-            if (pointerDown && Vector2.Distance(pointerDownPosition, mouse.position.ReadValue()) > clickMoveThreshold)
+            if (pointerDown && Vector2.Distance(pointerDownPosition, pointerPosition) > clickMoveThreshold)
             {
                 isDraggingPointer = true;
             }
 
-            if (!pointerDown || !mouse.leftButton.wasReleasedThisFrame)
+            if (!pointerDown || !releasedThisFrame)
             {
                 return;
             }
 
             pointerDown = false;
-            Vector2 pointerUpPosition = mouse.position.ReadValue();
-            bool pointerEndedOverUi = IsPointerOverUi();
+            Vector2 pointerUpPosition = pointerPosition;
+            bool pointerEndedOverUi = IsPointerOverUi(pointerUpPosition);
             if (isDraggingPointer || Vector2.Distance(pointerDownPosition, pointerUpPosition) > clickMoveThreshold)
             {
                 if (debugInput)
@@ -126,15 +156,60 @@ namespace LoadGame.Map
                 {
                     Debug.Log($"Selection found no visible tile. world={worldPosition}", this);
                 }
+                ClearSelection();
                 return;
             }
 
-            if (cell.CellType == GridCellType.Road)
+            if (!mapRenderer.IsCellRevealed(cell))
             {
                 if (debugInput)
                 {
-                    Debug.Log($"Selection ignored road cell. x={cell.x}, y={cell.y}, type={cell.type}, owned={cell.owned}", this);
+                    Debug.Log($"Selection ignored unrevealed cell. x={cell.x}, y={cell.y}", this);
                 }
+
+                if (!cell.owned)
+                {
+                    ShowUnavailableLandFeedback(cell);
+                }
+                else
+                {
+                    ClearSelection();
+                }
+                return;
+            }
+
+            if (mapRenderer.IsRoadVisible(cell))
+            {
+                selectedCell = cell;
+                mapRenderer.HighlightCell(cell);
+                if (mapRenderer.TryGetBuildingInstanceAtCell(cell, out BuildingInstance roadInstance)
+                    && roadInstance != null)
+                {
+                    popup.ShowInstalledBuilding(cell, roadInstance, GetBuildingIcon(roadInstance.Definition));
+                }
+                else
+                {
+                    popup.ShowRoad(cell);
+                }
+
+                return;
+            }
+
+            if (cell.CellType != GridCellType.Empty || mapRenderer.IsRoad(cell))
+            {
+                if (debugInput)
+                {
+                    Debug.Log($"Selection rejected non-purchasable terrain. x={cell.x}, y={cell.y}, type={cell.type}, owned={cell.owned}", this);
+                }
+
+                ShowUnavailableLandFeedback(cell);
+                return;
+            }
+
+
+            if (!cell.owned && !CanBuy(cell))
+            {
+                ShowUnavailableLandFeedback(cell);
                 return;
             }
 
@@ -145,13 +220,13 @@ namespace LoadGame.Map
 
             selectedCell = cell;
             mapRenderer.HighlightCell(cell);
-            if (!string.IsNullOrEmpty(cell.buildingId) && mapRenderer.TryGetBuildingDefinition(cell.buildingId, out BuildingDefinition installedBuilding))
+            if (mapRenderer.TryGetBuildingInstanceAtCell(cell, out BuildingInstance installedInstance) && installedInstance != null)
             {
-                popup.ShowInstalledBuilding(cell, installedBuilding);
+                popup.ShowInstalledBuilding(cell, installedInstance, GetBuildingIcon(installedInstance.Definition));
                 return;
             }
 
-            popup.Show(cell, landPrice, CanBuy(cell), buildingDefinitions, CanBuildOnCell(cell), GetBuildingIcon);
+            popup.Show(cell, currentLandPrice, CanBuy(cell), buildingDefinitions, CanPlaceSelectedBuilding, GetBuildingIcon);
         }
 
         public void TryBuySelectedCell()
@@ -161,15 +236,22 @@ namespace LoadGame.Map
                 return;
             }
 
-            if (!CanBuy(selectedCell))
+            if (economyManager.IsBankrupt())
             {
-                popup.Show(selectedCell, landPrice, canBuy: false);
                 return;
             }
 
-            economyManager.Pay(landPrice);
+            if (!CanBuy(selectedCell))
+            {
+                popup.Show(selectedCell, currentLandPrice, canBuy: false);
+                return;
+            }
+
+            economyManager.Pay(currentLandPrice);
             mapRenderer.SetCellOwned(selectedCell, true);
-            popup.Show(selectedCell, landPrice, canBuy: false, buildingDefinitions, CanBuildOnCell(selectedCell), GetBuildingIcon);
+            SoundManager.Instance?.PlaySFX(SoundId.LandPurchase);
+            IncreaseLandPrice();
+            popup.Show(selectedCell, currentLandPrice, canBuy: false, buildingDefinitions, CanPlaceSelectedBuilding, GetBuildingIcon);
         }
 
         public void TryBuildSelectedCell(int buildingIndex)
@@ -179,17 +261,58 @@ namespace LoadGame.Map
                 return;
             }
 
-            BuildingDefinition buildingDefinition = buildingDefinitions[buildingIndex];
-            if (!CanBuildOnCell(selectedCell))
+            if (economyManager.IsBankrupt())
             {
-                popup.Show(selectedCell, landPrice, CanBuy(selectedCell), buildingDefinitions, false, GetBuildingIcon);
+                return;
+            }
+
+            BuildingDefinition buildingDefinition = buildingDefinitions[buildingIndex];
+            if (!mapRenderer.CanPlaceBuilding(buildingDefinition, selectedCell))
+            {
+                SoundManager.Instance?.PlaySFX(SoundId.BuildingFail);
+                popup.Show(selectedCell, currentLandPrice, CanBuy(selectedCell), buildingDefinitions, CanPlaceSelectedBuilding, GetBuildingIcon);
                 return;
             }
 
             economyManager.Pay(buildingDefinition.price);
-            mapRenderer.SetCellBuilding(selectedCell, buildingDefinition.id);
-            economyManager.RegisterProduction(buildingDefinition.cashPerSecond);
-            popup.ShowInstalledBuilding(selectedCell, buildingDefinition);
+            BuildingInstance instance = mapRenderer.PlaceBuilding(selectedCell, buildingDefinition);
+            if (instance == null)
+            {
+                SoundManager.Instance?.PlaySFX(SoundId.BuildingFail);
+                popup.Show(selectedCell, currentLandPrice, CanBuy(selectedCell), buildingDefinitions, CanPlaceSelectedBuilding, GetBuildingIcon);
+                return;
+            }
+
+            SoundManager.Instance?.PlaySFX(SoundId.BuildingPlace);
+            popup.ShowInstalledBuilding(selectedCell, instance, GetBuildingIcon(buildingDefinition));
+        }
+
+        public void TryRemoveSelectedRoad()
+        {
+            TryRemoveSelectedObject();
+        }
+
+        public void TryRemoveSelectedObject()
+        {
+            if (selectedCell == null || mapRenderer == null || economyManager == null || economyManager.IsBankrupt())
+            {
+                return;
+            }
+
+            if (!mapRenderer.CanRemovePlacedObject(selectedCell))
+            {
+                return;
+            }
+
+            long refund = mapRenderer.GetDemolitionRefund(selectedCell);
+            if (mapRenderer.RemovePlacedObject(selectedCell))
+            {
+                if (refund > 0L)
+                {
+                    economyManager.AddCash(refund);
+                }
+                popup.Hide();
+            }
         }
 
         private bool CanBuy(GridCellData cell)
@@ -197,16 +320,43 @@ namespace LoadGame.Map
             return cell != null
                 && cell.CellType == GridCellType.Empty
                 && !cell.owned
+                && mapRenderer != null
+                && mapRenderer.CanPurchaseLand(cell)
                 && economyManager != null;
         }
 
         private bool CanBuildOnCell(GridCellData cell)
         {
             return cell != null
-                && cell.owned
-                && cell.CellType == GridCellType.Empty
-                && string.IsNullOrEmpty(cell.buildingId)
-                && economyManager != null;
+                && economyManager != null
+                && buildingDefinitions != null
+                && HasAnyPlaceableBuilding(cell);
+        }
+
+        private bool CanPlaceSelectedBuilding(BuildingDefinition definition)
+        {
+            return selectedCell != null
+                && mapRenderer != null
+                && definition != null
+                && mapRenderer.CanPlaceBuilding(definition, selectedCell);
+        }
+
+        private bool HasAnyPlaceableBuilding(GridCellData cell)
+        {
+            if (mapRenderer == null || buildingDefinitions == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < buildingDefinitions.Length; i++)
+            {
+                if (buildingDefinitions[i] != null && mapRenderer.CanPlaceBuilding(buildingDefinitions[i], cell))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool IsValidBuildingIndex(int buildingIndex)
@@ -222,15 +372,82 @@ namespace LoadGame.Map
             return mapRenderer == null ? null : mapRenderer.LoadBuildingIcon(definition);
         }
 
+        private void IncreaseLandPrice()
+        {
+            double multiplier = 1d + Math.Max(0d, landPriceGrowthRate);
+            currentLandPrice = (long)Math.Min(long.MaxValue, Math.Round(currentLandPrice * multiplier, MidpointRounding.AwayFromZero));
+        }
+
+        private void ShowUnavailableLandFeedback(GridCellData cell)
+        {
+            selectedCell = null;
+            popup.Hide();
+            mapRenderer.ClearBuildingFade();
+            mapRenderer.ShowPurchasableLandHint();
+            SoundManager.Instance?.PlaySFX(SoundId.LandUnavailable);
+            if (purchaseFeedbackPool != null)
+            {
+                purchaseFeedbackPool.Show(
+                    unavailableLandMessage,
+                    mapRenderer.GetCellCenterWorld(cell.x, cell.y),
+                    targetCamera);
+            }
+        }
+
         private Vector3 ScreenToWorldOnMapPlane(Vector2 screenPosition)
         {
             Vector3 screenPoint = new Vector3(screenPosition.x, screenPosition.y, -targetCamera.transform.position.z);
             return targetCamera.ScreenToWorldPoint(screenPoint);
         }
 
-        private static bool IsPointerOverUi()
+        private static bool TryGetPointerState(
+            out Vector2 position,
+            out bool pressedThisFrame,
+            out bool releasedThisFrame)
         {
-            return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            Touchscreen touchscreen = Touchscreen.current;
+            if (touchscreen != null)
+            {
+                var touch = touchscreen.primaryTouch;
+                if (touch.press.isPressed || touch.press.wasPressedThisFrame || touch.press.wasReleasedThisFrame)
+                {
+                    position = touch.position.ReadValue();
+                    pressedThisFrame = touch.press.wasPressedThisFrame;
+                    releasedThisFrame = touch.press.wasReleasedThisFrame;
+                    return true;
+                }
+            }
+
+            Mouse mouse = Mouse.current;
+            if (mouse != null)
+            {
+                position = mouse.position.ReadValue();
+                pressedThisFrame = mouse.leftButton.wasPressedThisFrame;
+                releasedThisFrame = mouse.leftButton.wasReleasedThisFrame;
+                return true;
+            }
+
+            position = default;
+            pressedThisFrame = false;
+            releasedThisFrame = false;
+            return false;
+        }
+
+        private static bool IsPointerOverUi(Vector2 screenPosition)
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                return false;
+            }
+
+            PointerEventData eventData = new PointerEventData(eventSystem)
+            {
+                position = screenPosition
+            };
+            List<RaycastResult> results = new List<RaycastResult>();
+            eventSystem.RaycastAll(eventData, results);
+            return results.Count > 0;
         }
 
         public void ClearSelection()
@@ -239,6 +456,7 @@ namespace LoadGame.Map
             if (mapRenderer != null)
             {
                 mapRenderer.ClearHighlight();
+                mapRenderer.ClearBuildingFade();
             }
         }
     }

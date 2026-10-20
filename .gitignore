@@ -6,6 +6,10 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
+.utmp/
+.codex/
+Assets/Sounds/
+Assets/Sounds.meta
 
 # Unity auto-generated project files
 *.csproj

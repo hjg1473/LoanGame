@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 528dd18ce20950f48b5d0810f21c1545, type: 3}
+  m_Name: 2
+  m_EditorClassIdentifier: Assembly-CSharp::LoadGame.Map.BuildingDefinition
+  buildingId: factory
+  displayName: Workshop
+  description: A starter workplace that turns local labor into steady income.
+  icon: {fileID: 21300000, guid: 057533eda1efa304fa295caa79655245, type: 3}
+  prefab: {fileID: 0}
+  cost: 1500
+  productionPerSecond: 30
+  maintenancePerSecond: 5
+  placementKind: 0
+  roadType: 0
+  buildingRole: 2
+  starRating: 1
+  populationCapacity: 0
+  requiredWorkers: 10
+  leisureCapacity: 0
+  footprintWidth: 1
+  footprintHeight: 1
+  visualOffset: {x: 0, y: 0.625, z: 0}
+  cityValue: 1500
+  spritePaths: []
+  spritePath: Sprites/Buildings/Building2
+  replaceGroundTile: 1
+  groundSpritePath: Sprites/rock1

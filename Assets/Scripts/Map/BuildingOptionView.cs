@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace LoadGame.Map
@@ -10,14 +11,41 @@ namespace LoadGame.Map
         [SerializeField] private Image iconImage;
         [SerializeField] private TMP_Text nameText;
         [SerializeField] private TMP_Text productionText;
+        [SerializeField] private TMP_Text maintenanceText;
         [SerializeField] private TMP_Text priceText;
         [SerializeField] private Button buildButton;
+        [SerializeField] private CanvasGroup canvasGroup;
+        [Header("Availability Colors")]
+        [SerializeField] private Image[] imageTintTargets;
+        [SerializeField] private TMP_Text[] textTintTargets;
+        [FormerlySerializedAs("availableColor")]
+        [SerializeField] private Color availableImageColor = Color.white;
+        [SerializeField] private Color availableTextColor = Color.white;
+        [FormerlySerializedAs("unavailableColor")]
+        [SerializeField] private Color unavailableImageColor = new Color(0.55f, 0.55f, 0.55f, 1f);
+        [SerializeField] private Color unavailableTextColor = new Color(0.55f, 0.55f, 0.55f, 1f);
+        [SerializeField] private float unavailableAlpha = 0.65f;
 
         private int buildingIndex;
         private Action<int> clicked;
 
         private void Awake()
         {
+            if (canvasGroup == null)
+            {
+                canvasGroup = GetComponent<CanvasGroup>();
+            }
+
+            if (imageTintTargets == null || imageTintTargets.Length == 0)
+            {
+                imageTintTargets = GetComponentsInChildren<Image>(true);
+            }
+
+            if (textTintTargets == null || textTintTargets.Length == 0)
+            {
+                textTintTargets = GetComponentsInChildren<TMP_Text>(true);
+            }
+
             if (buildButton != null)
             {
                 buildButton.onClick.RemoveListener(OnBuildClicked);
@@ -43,7 +71,17 @@ namespace LoadGame.Map
 
             if (productionText != null)
             {
-                productionText.text = $"+{definition.cashPerSecond:N0}/sec";
+                string roleSummary = GetRoleSummary(definition);
+                productionText.text = maintenanceText == null && definition.maintenancePerSecond > 0d
+                    ? $"{roleSummary}  -${definition.maintenancePerSecond:N0}/s"
+                    : roleSummary;
+            }
+
+            if (maintenanceText != null)
+            {
+                maintenanceText.text = definition.maintenancePerSecond > 0d
+                    ? $"-${definition.maintenancePerSecond:N0}/s"
+                    : string.Empty;
             }
 
             if (priceText != null)
@@ -56,7 +94,28 @@ namespace LoadGame.Map
                 buildButton.interactable = interactable;
             }
 
+            ApplyAvailability(interactable);
             gameObject.SetActive(true);
+        }
+
+        private static string GetRoleSummary(BuildingDefinition definition)
+        {
+            if (definition.IsRoad)
+            {
+                return "AUTO-CONNECT ROAD";
+            }
+
+            switch (definition.buildingRole)
+            {
+                case BuildingRole.Residential:
+                    return $"MAX POP +{definition.populationCapacity:N0}";
+                case BuildingRole.Workplace:
+                    return $"WORKERS {definition.requiredWorkers:N0}  +{definition.cashPerSecond:N0}/s";
+                case BuildingRole.Leisure:
+                    return $"LEISURE +{definition.leisureCapacity:N0}";
+                default:
+                    return definition.cashPerSecond > 0d ? $"+{definition.cashPerSecond:N0}/s" : string.Empty;
+            }
         }
 
         public void Hide()
@@ -68,6 +127,38 @@ namespace LoadGame.Map
         private void OnBuildClicked()
         {
             clicked?.Invoke(buildingIndex);
+        }
+
+        private void ApplyAvailability(bool available)
+        {
+            Color imageColor = available ? availableImageColor : unavailableImageColor;
+            if (imageTintTargets != null)
+            {
+                for (int i = 0; i < imageTintTargets.Length; i++)
+                {
+                    if (imageTintTargets[i] != null)
+                    {
+                        imageTintTargets[i].color = imageColor;
+                    }
+                }
+            }
+
+            Color textColor = available ? availableTextColor : unavailableTextColor;
+            if (textTintTargets != null)
+            {
+                for (int i = 0; i < textTintTargets.Length; i++)
+                {
+                    if (textTintTargets[i] != null)
+                    {
+                        textTintTargets[i].color = textColor;
+                    }
+                }
+            }
+
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = available ? 1f : unavailableAlpha;
+            }
         }
     }
 }

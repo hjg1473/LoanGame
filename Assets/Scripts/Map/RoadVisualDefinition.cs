@@ -7,6 +7,8 @@ namespace LoadGame.Map
     public sealed class RoadVisualDefinition
     {
         [Range(0, 15)] public int connectionMask;
+        public Sprite sprite;
+        public GameObject prefab;
         public string spritePath = "Sprites/Load1";
         public bool flipY180;
     }

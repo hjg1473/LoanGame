@@ -6,7 +6,8 @@ namespace LoadGame.Map
     public enum GridCellType
     {
         Empty,
-        Road
+        Road,
+        Water
     }
 
     [Serializable]
@@ -17,13 +18,19 @@ namespace LoadGame.Map
         public string type = "empty";
         public bool owned;
         public string buildingId;
+        public string buildingInstanceId;
 
         public GridCellType CellType
         {
             get
             {
-                return string.Equals(type, "road", StringComparison.OrdinalIgnoreCase)
-                    ? GridCellType.Road
+                if (string.Equals(type, "road", StringComparison.OrdinalIgnoreCase))
+                {
+                    return GridCellType.Road;
+                }
+
+                return string.Equals(type, "water", StringComparison.OrdinalIgnoreCase)
+                    ? GridCellType.Water
                     : GridCellType.Empty;
             }
         }

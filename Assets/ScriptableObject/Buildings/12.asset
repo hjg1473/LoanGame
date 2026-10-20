@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 528dd18ce20950f48b5d0810f21c1545, type: 3}
+  m_Name: 12
+  m_EditorClassIdentifier: Assembly-CSharp::LoadGame.Map.BuildingDefinition
+  buildingId: 12121212
+  displayName: Pocket Park
+  description: Low-cost green space for early happiness support.
+  icon: {fileID: 21300000, guid: 356e21293d47c7842b5667203a2fc24e, type: 3}
+  prefab: {fileID: 0}
+  cost: 2500
+  productionPerSecond: 0
+  maintenancePerSecond: 8
+  placementKind: 0
+  roadType: 0
+  buildingRole: 3
+  starRating: 1
+  populationCapacity: 0
+  requiredWorkers: 0
+  leisureCapacity: 35
+  footprintWidth: 1
+  footprintHeight: 1
+  visualOffset: {x: 0, y: 0.625, z: 0}
+  cityValue: 2500
+  spritePaths: []
+  spritePath: Sprites/Buildings/Building12
+  replaceGroundTile: 1
+  groundSpritePath: Sprites/rock1
